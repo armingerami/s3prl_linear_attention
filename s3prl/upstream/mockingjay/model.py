@@ -52,8 +52,8 @@ def fast_multihead_attention(q, k, v, p=2, mask=0, denum_term=1, normalize=1, dr
         if normalize == 1:
             # qn = torch.linalg.norm(q, dim = 3)
             # kn = torch.linalg.norm(k, dim = 3)
-            q = q/torch.linalg.norm(qn, dim = 2, ord = float('inf')).unsqueeze(-1).unsqueeze(-1)
-            k = k/torch.linalg.norm(kn, dim = 2, ord = float('inf')).unsqueeze(-1).unsqueeze(-1)
+            q = q/torch.linalg.norm(q, dim = 2, ord = float('inf')).unsqueeze(-1).unsqueeze(-1)
+            k = k/torch.linalg.norm(k, dim = 2, ord = float('inf')).unsqueeze(-1).unsqueeze(-1)
         else:
             denum_term = denum_term*math.sqrt(q.shape[3])
         denum_term2 = 2*denum_term*denum_term
