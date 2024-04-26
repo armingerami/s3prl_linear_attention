@@ -47,7 +47,7 @@ class FASTMultiHeadAttention_Function(torch.autograd.Function):
         ctx.save_for_backward(q,k,v,o)
         ctx.mask = mask
         ctx.b = b
-        ctx.t = temperatue
+        ctx.t = temperature
         o = o[:,:q.shape[1],:].permute(2,0,1).contiguous() # (n,d,b*h) -> (b*h,n,d)
         if b != 0: o = o.reshape((b,int(o.shape[0]/b),o.shape[1],o.shape[2])) # (b*h,n,d) -> (b,h,n,d)
         return o
