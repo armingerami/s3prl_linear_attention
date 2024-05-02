@@ -25,7 +25,7 @@ import fastmax_cuda
 
 class FASTMultiHeadAttention_Function(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, q,k,v, drop_noise, rpe_matrix = None, mask = False, dropout = 0.0, normalize = False, temperature = 1.0):
+    def forward(ctx, q,k,v, drop_noise, rpe_matrix = None, mask = False, dropout = 0.0, normalize = False, temperature = 1.0, a0 = 1.0, a1 = 1.0, a2 = 0.5,lim = 1.0):
         b = 0
         if len(q.shape) == 4:
           b = q.shape[0]
@@ -38,17 +38,25 @@ class FASTMultiHeadAttention_Function(torch.autograd.Function):
         if rpe_matrix is None:
           print("Relative Positional Encoding must be given. Send a 2*n-1 by d matrix of all zeros if you don't want to use RPE.")
 
-        q = q.permute(1,2,0).contiguous() # (b*h,n,d) -> (n,d,b*h)
-        k = k.permute(1,2,0).contiguous() # (b*h,n,d) -> (n,d,b*h)
-        v = v.permute(1,2,0).contiguous() # (b*h,n,d) -> (n,d,b*h)
-        drop_noise = drop_noise.permute(1,2,0).contiguous() # (b*h,n,d) -> (n,d,b*h)
-
-        o = fastmax_cuda.forwardpass(q,k,v,drop_noise,rpe_matrix,mask,dropout,normalize,temperature)
+        # q = q.permute(1,2,0).contiguous() # (b*h,n,d) -> (n,d,b*h)
+        # k = k.permute(1,2,0).contiguous() # (b*h,n,d) -> (n,d,b*h)
+        # v = v.permute(1,2,0).contiguous() # (b*h,n,d) -> (n,d,b*h)
+        q = q.permute(1,0,2).contiguous() # (b*h,n,d) -> (n,b*h,d)
+        k = k.permute(1,0,2).contiguous() # (b*h,n,d) -> (n,b*h,d)
+        v = v.permute(1,0,2).contiguous() # (b*h,n,d) -> (n,b*h,d)
+        drop_noise = drop_noise.permute(1,0,2).contiguous() # (b*h,n,d) -> (n,b*h,d)
+        # print(torch.cuda.memory_allocated())
+        o = fastmax_cuda.forwardpass(q,k,v,drop_noise,rpe_matrix,mask,dropout,normalize,temperature,a0,a1,a2,lim)
+        # print(torch.cuda.memory_allocated())
+        # print('a')
         ctx.save_for_backward(q,k,v,o)
         ctx.mask = mask
         ctx.b = b
-        ctx.t = temperature
-        o = o[:,:q.shape[1],:].permute(2,0,1).contiguous() # (n,d,b*h) -> (b*h,n,d)
+        ctx.t = temperatue
+        ctx.a0 = a0
+        ctx.a1 = a1
+        ctx.a2 = a2
+        o = o[:,:,:q.shape[2]].permute(1,0,2).contiguous() # (n,b*h,d) -> (b*h,n,d)
         if b != 0: o = o.reshape((b,int(o.shape[0]/b),o.shape[1],o.shape[2])) # (b*h,n,d) -> (b,h,n,d)
         return o
 
@@ -58,14 +66,17 @@ class FASTMultiHeadAttention_Function(torch.autograd.Function):
         mask = ctx.mask
         b = ctx.b
         t = ctx.t
+        a0 = ctx.a0
+        a1 = ctx.a1
+        a2 = ctx.a2
 
         if(b != 0): grad_output = grad_output.reshape((grad_output.shape[0]*grad_output.shape[1],grad_output.shape[2],grad_output.shape[3])).contiguous()
-        grad_output = grad_output.permute(1,2,0).contiguous() # (b*h,n,d) -> (n,d,b*h)
-        gradq, gradk, gradv = fastmax_cuda.backwardpass(q,k,v,o,grad_output,mask)
+        grad_output = grad_output.permute(1,0,2).contiguous() # (b*h,n,d) -> (n,b*h,d)
+        gradq, gradk, gradv = fastmax_cuda.backwardpass(q,k,v,o,grad_output,mask,a0,a1,a2)
 
-        gradq = gradq.permute(2,0,1).contiguous() # (n,d,b*h) -> (b*h,n,d)
-        gradk = gradk.permute(2,0,1).contiguous() # (n,d,b*h) -> (b*h,n,d)
-        gradv = gradv.permute(2,0,1).contiguous() # (n,d,b*h) -> (b*h,n,d)
+        gradq = gradq.permute(1,0,2).contiguous() # (n,b*h,d) -> (b*h,n,d)
+        gradk = gradk.permute(1,0,2).contiguous() # (n,b*h,d) -> (b*h,n,d)
+        gradv = gradv.permute(1,0,2).contiguous() # (n,b*h,d) -> (b*h,n,d)
 
         if(b != 0):
           gradq = gradq.reshape((b,int(gradq.shape[0]/b),gradq.shape[1],gradq.shape[2])).contiguous()
@@ -78,11 +89,11 @@ class FASTMultiHeadAttention(torch.nn.Module):
     def __init__(self):
         super(FASTMultiHeadAttention, self).__init__()
 
-    def forward(self, q,k,v,drop_noise,rpe_matrix = None, mask = False, dropout = 0.0, normalize = False, temperatue = 1.0):
-        return FASTMultiHeadAttention_Function.apply(q,k,v,drop_noise,rpe_matrix,mask,dropout,normalize,temperatue)
+    def forward(self, q,k,v,drop_noise,rpe_matrix = None, mask = False, dropout = 0.0, normalize = False, temperatue = 1.0, a0 = 1.0, a1 = 1.0, a2 = 0.5,lim = 1.0):
+        return FASTMultiHeadAttention_Function.apply(q,k,v,drop_noise,rpe_matrix,mask,dropout,normalize,temperatue,a0,a1,a2,lim)
     
 
-def rpe_matrix_creator(n, d, device, dtype, structured = True):
+def rpe_matrix_creator(n, d, device, dtype, structured = True, is_zero = False):
     """
     Creates the relative positional encoding matrix
     Inputs: (assuming query is a (b,h,n,d) or (b*h,n,d) tensor)
@@ -106,9 +117,12 @@ def rpe_matrix_creator(n, d, device, dtype, structured = True):
         pe_positive = torch.flip(pe_positive, [0])
         pe_negative = pe_negative[1:]
         rpe = torch.cat([pe_positive, pe_negative], dim=0)
-    else: rpe = torch.normal(0,1,size=(2*n-1,d),device=device,dtype=dtype)
+    else: 
+        if is_zero:
+            rpe = torch.zeros(0,1,size=(2*n-1,d),device=device,dtype=dtype)
+        else:
+            rpe = torch.normal(0,1,size=(2*n-1,d),device=device,dtype=dtype)
     return rpe
-
 # the inputs of fastmax are query, key, and value (q,k,v) in shape of  4-dimensional tensors (b, h, n, d); i.e. (batch, head, token length, dimension/channel per head)
 fastmax = FASTMultiHeadAttention()
 
