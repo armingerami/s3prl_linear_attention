@@ -124,8 +124,10 @@ def rpe_matrix_creator(n, d, device, dtype, structured = True, is_zero = False):
             rpe = torch.normal(0,1,size=(2*n-1,d),device=device,dtype=dtype)
     return rpe
     
+
 # the inputs of fastmax are query, key, and value (q,k,v) in shape of  4-dimensional tensors (b, h, n, d); i.e. (batch, head, token length, dimension/channel per head)
 fastmax_custom = FASTMultiHeadAttention()
+
 class TransformerConfig(object):
     """Configuration class to store the configuration of a `TransformerModel`."""
 
@@ -294,9 +296,13 @@ class TransformerSelfAttention(nn.Module):
         dropout = 0.0 # between 0 and 1
         normalize = True
         temperatue = 1.0
+        a0 = 1.0
+        a1 = 1.0
+        a2 = 0.5
+        lim = 1.0
         rpe_matrix = rpe_matrix_creator(query_layer.shape[-2],query_layer.shape[-1],query_layer.device,query_layer.dtype)
         drop_noise = torch.normal(0,1,size=(query_layer.shape),dtype=query_layer.dtype,device=query_layer.device)
-        context_layer = fastmax(query_layer,key_layer,value_layer,drop_noise,rpe_matrix,mask,dropout,normalize,temperatue)
+        context_layer = fastmax(query_layer,key_layer,value_layer,drop_noise,rpe_matrix,mask,dropout,normalize,temperatue,a0,a1,a2,lim)
         # context_layer: (batch_size, head_num, seqlen, head_dim)
 
 
