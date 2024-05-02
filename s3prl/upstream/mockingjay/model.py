@@ -46,7 +46,7 @@ class FASTMultiHeadAttention_Function(torch.autograd.Function):
         v = v.permute(1,0,2).contiguous() # (b*h,n,d) -> (n,b*h,d)
         drop_noise = drop_noise.permute(1,0,2).contiguous() # (b*h,n,d) -> (n,b*h,d)
         # print(torch.cuda.memory_allocated())
-        o = fastmax_cuda.forwardpass(q,k,v,drop_noise,rpe_matrix,mask,dropout,normalize,temperature)
+        o = fastmax_cuda.forwardpass(q,k,v,drop_noise,rpe_matrix,mask,dropout,normalize,temperature,a0,a1,a2,lim)
         # print(torch.cuda.memory_allocated())
         # print('a')
         ctx.save_for_backward(q,k,v,o)
@@ -56,9 +56,9 @@ class FASTMultiHeadAttention_Function(torch.autograd.Function):
         ctx.a0 = a0
         ctx.a1 = a1
         ctx.a2 = a2
-        o = o[:,:,:q.shape[2]].permute(1,0,2).contiguous() # (n,b*h,d) -> (b*h,n,d)
-        if b != 0: o = o.reshape((b,int(o.shape[0]/b),o.shape[1],o.shape[2])) # (b*h,n,d) -> (b,h,n,d)
-        return o
+        out = o[:,:,:q.shape[2]].permute(1,0,2).contiguous() # (n,b*h,d) -> (b*h,n,d)
+        if b != 0: out = out.reshape((b,int(out.shape[0]/b),out.shape[1],out.shape[2])) # (b*h,n,d) -> (b,h,n,d)
+        return out
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -72,7 +72,7 @@ class FASTMultiHeadAttention_Function(torch.autograd.Function):
 
         if(b != 0): grad_output = grad_output.reshape((grad_output.shape[0]*grad_output.shape[1],grad_output.shape[2],grad_output.shape[3])).contiguous()
         grad_output = grad_output.permute(1,0,2).contiguous() # (b*h,n,d) -> (n,b*h,d)
-        gradq, gradk, gradv = fastmax_cuda.backwardpass(q,k,v,o,grad_output,mask)
+        gradq, gradk, gradv = fastmax_cuda.backwardpass(q,k,v,o,grad_output,mask,a0,a1,a2)
 
         gradq = gradq.permute(1,0,2).contiguous() # (n,b*h,d) -> (b*h,n,d)
         gradk = gradk.permute(1,0,2).contiguous() # (n,b*h,d) -> (b*h,n,d)
@@ -123,9 +123,9 @@ def rpe_matrix_creator(n, d, device, dtype, structured = True, is_zero = False):
         else:
             rpe = torch.normal(0,1,size=(2*n-1,d),device=device,dtype=dtype)
     return rpe
+    
 # the inputs of fastmax are query, key, and value (q,k,v) in shape of  4-dimensional tensors (b, h, n, d); i.e. (batch, head, token length, dimension/channel per head)
-fastmax = FASTMultiHeadAttention()
-
+fastmax_custom = FASTMultiHeadAttention()
 class TransformerConfig(object):
     """Configuration class to store the configuration of a `TransformerModel`."""
 
