@@ -46,7 +46,7 @@ class FASTMultiHeadAttention_Function(torch.autograd.Function):
         v = v.permute(1,0,2).contiguous() # (b*h,n,d) -> (n,b*h,d)
         drop_noise = drop_noise.permute(1,0,2).contiguous() # (b*h,n,d) -> (n,b*h,d)
         # print(torch.cuda.memory_allocated())
-        o = fastmax_cuda.forwardpass(q,k,v,drop_noise,rpe_matrix,mask,dropout,normalize,temperature,a0,a1,a2,lim)
+        o = fastmax_cuda.forwardpass(q,k,v,drop_noise,rpe_matrix,mask,dropout,normalize,temperature)
         # print(torch.cuda.memory_allocated())
         # print('a')
         ctx.save_for_backward(q,k,v,o)
@@ -72,7 +72,7 @@ class FASTMultiHeadAttention_Function(torch.autograd.Function):
 
         if(b != 0): grad_output = grad_output.reshape((grad_output.shape[0]*grad_output.shape[1],grad_output.shape[2],grad_output.shape[3])).contiguous()
         grad_output = grad_output.permute(1,0,2).contiguous() # (b*h,n,d) -> (n,b*h,d)
-        gradq, gradk, gradv = fastmax_cuda.backwardpass(q,k,v,o,grad_output,mask,a0,a1,a2)
+        gradq, gradk, gradv = fastmax_cuda.backwardpass(q,k,v,o,grad_output,mask)
 
         gradq = gradq.permute(1,0,2).contiguous() # (n,b*h,d) -> (b*h,n,d)
         gradk = gradk.permute(1,0,2).contiguous() # (n,b*h,d) -> (b*h,n,d)
