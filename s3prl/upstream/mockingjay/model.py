@@ -126,7 +126,7 @@ def rpe_matrix_creator(n, d, device, dtype, structured = True, is_zero = False):
     
 
 # the inputs of fastmax are query, key, and value (q,k,v) in shape of  4-dimensional tensors (b, h, n, d); i.e. (batch, head, token length, dimension/channel per head)
-fastmax_custom = FASTMultiHeadAttention()
+fastmax = FASTMultiHeadAttention()
 
 class TransformerConfig(object):
     """Configuration class to store the configuration of a `TransformerModel`."""
