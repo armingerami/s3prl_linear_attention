@@ -316,6 +316,7 @@ void apply_norm(torch::PackedTensorAccessor32<float,3,torch::RestrictPtrTraits> 
   float t;
   if(m < d && i < bh){
     t = maxes[i];
+    if(t < 0.1) t = 0.1;
     for(int l = 0; l < n; ++l){
       a[l][i][m]*= lim/t;
     }
