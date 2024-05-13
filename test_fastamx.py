@@ -1,7 +1,6 @@
 import math
 import torch
 from torch import cuda
-# import fastmax_cpp
 import fastmax_cuda
 import numpy as np
 import time
