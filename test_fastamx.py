@@ -306,7 +306,7 @@ for i in np.logspace(strt, endd, count):
     fast_time_custom[j] += (end_time - start_time)/rep
 
 
-rep = 1
+rep = 100
 # # j = -1
 # # for i in np.logspace(strt, endd, count):
 # #   j += 1
