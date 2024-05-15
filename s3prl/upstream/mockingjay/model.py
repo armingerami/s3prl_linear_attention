@@ -250,6 +250,7 @@ class TransformerSelfAttention(nn.Module):
         self.value = nn.Linear(config.hidden_size, self.all_head_size)
 
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
+        self.dropout_rate = config.attention_probs_dropout_prob
 
     def transpose_for_scores(self, x):
         new_x_shape = x.size()[:-1] + (
@@ -293,7 +294,7 @@ class TransformerSelfAttention(nn.Module):
         # Leslie look here! dropout is a new hyperparameter between 0 and 1 that kinda adds noise to the output
         # so that the model doesn't overfit/get stuck on local minima.
         mask = False
-        dropout = 0.0 # between 0 and 1
+        dropout = self.dropout_rate # between 0 and 1
         normalize = True
         temperatue = 1.0
         a0 = 1.0
