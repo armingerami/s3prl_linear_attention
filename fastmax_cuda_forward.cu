@@ -18,6 +18,8 @@
 // // -lim^2 <= q.k <= lim^2
 // __device__ float lim = 1;
 
+// srun --gres=gpu:rtxa5000 --qos=high  --time=24:00:00 --mem=32gb sh run_cc3m.sh
+
 namespace {
 __global__
 void calc_unmasked(const torch::PackedTensorAccessor32<float,3,torch::RestrictPtrTraits> q, const torch::PackedTensorAccessor32<float,3,torch::RestrictPtrTraits> k, torch::PackedTensorAccessor32<float,3,torch::RestrictPtrTraits> v, torch::PackedTensorAccessor32<float,3,torch::RestrictPtrTraits> o, int bh, int nq, int nk, int d, float a0, float a1, float a2){
@@ -54,39 +56,6 @@ void calc_unmasked(const torch::PackedTensorAccessor32<float,3,torch::RestrictPt
       }
     }
 
-    // calc quad denum
-    for(int rr = 0; rr < d/sz; ++rr){
-      for(int r = 0; r < sz; ++r) tr[r]= 0;
-      for(int l = 0; l < nk;  ++l){
-        s[outer] = k[l][i][outer];
-        __syncthreads();
-        loc1 = rr*sz;
-        for(int r = 0; r < sz; ++r){
-          tr[r] += s[outer]*s[loc1+r];
-        }
-      }
-      for(int l = 0; l < nq;  ++l){
-        s[d+outer] = 0;
-        s[outer] = q[l][i][outer];
-        __syncthreads();
-        loc2 = rr*sz;
-        for(int r = 0; r < sz; ++r){
-          s[d+outer] += tr[r]*s[outer]*s[loc2+r];
-        }
-        o[l][i][outer] += s[d+outer];
-      }
-      __syncthreads();
-      for(int l = 0; l < nq; ++l){
-        t = 0;
-        s[outer] = o[l][i][outer];
-        __syncthreads();
-        if(outer == 0){
-          for(int r = 0; r < d; ++r) t += s[r];
-          o[l][i][d] += a2*t;
-        }
-      }
-      __syncthreads();
-    }
 
     // calc cons
     t = 0;
@@ -108,31 +77,6 @@ void calc_unmasked(const torch::PackedTensorAccessor32<float,3,torch::RestrictPt
       }
     }
 
-    // calc quad
-    for(int m = 0; m < d; ++m){
-      for(int rr = 0; rr < d/sz; ++rr){
-        for(int r = 0; r < sz; ++r) tr[r]= 0;
-        for(int l = 0; l < nk;  ++l){
-          s[d+outer] = k[l][i][m]*k[l][i][outer];
-          tv = v[l][i][outer];
-          __syncthreads();
-          loc1 = d+rr*sz;
-          for(int r = 0; r < sz; ++r){
-            tr[r] += s[loc1+r]*tv;
-          }      
-        }
-        for(int l = 0; l < nq;  ++l){
-          s[outer] = q[l][i][m]*q[l][i][outer];
-          __syncthreads();
-          t = 0;
-          loc2 = rr*sz;
-          for(int r = 0; r < sz; ++r){
-            t += tr[r]*s[loc2+r];
-          }      
-          o[l][i][outer] += a2*t;
-        }
-      }
-    }
 
     for(int l = 0; l < nq;  ++l) o[l][i][outer] /= o[l][i][d];
   }
@@ -174,46 +118,6 @@ void calc_masked(const torch::PackedTensorAccessor32<float,3,torch::RestrictPtrT
       }
     }
 
-    // calc quad denum
-    for(int rr = 0; rr < d/sz; ++rr){
-      for(int r = 0; r < sz; ++r) tr[r]= 0;
-      for(int l = 0; l < nk-nq;  ++l){
-        s[outer] = k[l][i][outer];
-        __syncthreads();
-        loc1 = rr*sz;
-        for(int r = 0; r < sz; ++r){
-          tr[r] += s[outer]*s[loc1+r];
-        }
-      }
-      __syncthreads();
-      for(int l = 0; l < nq; ++l){
-        s[outer] = k[nk-nq+l][i][outer];
-        __syncthreads();
-        loc1 = rr*sz;
-        for(int r = 0; r < sz; ++r){
-          tr[r] += s[outer]*s[loc1+r];
-        }
-        s[d+outer] = 0;
-        s[outer] = q[l][i][outer];
-        __syncthreads();
-        loc2 = rr*sz;
-        for(int r = 0; r < sz; ++r){
-          s[d+outer] += tr[r]*s[outer]*s[loc2+r];
-        }
-        o[l][i][outer] += s[d+outer];
-      }
-      __syncthreads();
-      for(int l = 0; l < nq; ++l){
-        t = 0;
-        s[outer] = o[l][i][outer];
-        __syncthreads();
-        if(outer == 0){
-          for(int r = 0; r < d; ++r) t += s[r];
-          o[l][i][d] += a2*t;
-        }
-      }
-
-    }
 
     // calc cons
     t = 0;
@@ -234,36 +138,6 @@ void calc_masked(const torch::PackedTensorAccessor32<float,3,torch::RestrictPtrT
       for(int l = 0; l < nq;  ++l){
         t += k[nk-nq+l][i][m]*v[nk-nq+l][i][outer];
         o[l][i][outer] += a1*t*q[l][i][m];
-      }
-    }
-
-    // calc quad
-    for(int m = 0; m < d; ++m){
-      for(int rr = 0; rr < d/sz; ++rr){
-        for(int r = 0; r < sz; ++r) tr[r]= 0;
-        for(int l = 0; l < nk-nq;  ++l){
-          s[d+outer] = k[l][i][m]*k[l][i][outer];
-          tv = v[l][i][outer];
-          __syncthreads();
-          loc1 = d+rr*sz;
-          for(int r = 0; r < sz; ++r){
-            tr[r] += s[loc1+r]*tv;
-          }      
-        }
-        for(int l = 0; l < nq;  ++l){
-          s[outer] = q[l][i][m]*q[l][i][outer];
-          s[d+outer] = k[nk-nq+l][i][m]*k[nk-nq+l][i][outer];
-          tv = v[nk-nq+l][i][outer];
-          __syncthreads();
-          t = 0;
-          loc1 = d+rr*sz;
-          loc2 = rr*sz;
-          for(int r = 0; r < sz; ++r){
-            tr[r] += s[loc1+r]*tv;
-            t += tr[r]*s[loc2+r];
-          }      
-          o[l][i][outer] += a2*t;
-        }
       }
     }
 
