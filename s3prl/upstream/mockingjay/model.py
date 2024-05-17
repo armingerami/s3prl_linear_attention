@@ -297,15 +297,15 @@ class TransformerSelfAttention(nn.Module):
         dropout = self.dropout_rate # between 0 and 1
         normalize = True
         temperatue = 1.0
-        # a0 = 1.0
-        # a1 = 1.0
-        # a2 = 0.5
-        # lim = 1.0
-        
-        a0 = 11.0
-        a1 = 8.0
-        a2 = 1.0
+        a0 = 1.0
+        a1 = 1.0
+        a2 = 0.5
         lim = 1.0
+        
+        # a0 = 11.0
+        # a1 = 8.0
+        # a2 = 1.0
+        # lim = 1.0
         rpe_matrix = rpe_matrix_creator(query_layer.shape[-2],query_layer.shape[-1],query_layer.device,query_layer.dtype)
         drop_noise = torch.normal(0,1,size=(query_layer.shape),dtype=query_layer.dtype,device=query_layer.device)
         context_layer = fastmax(query_layer,key_layer,value_layer,drop_noise,rpe_matrix,mask,dropout,normalize,temperatue,a0,a1,a2,lim)
