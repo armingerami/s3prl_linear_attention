@@ -29,8 +29,6 @@ void calc_gradq_unmasked(torch::PackedTensorAccessor32<float,3,torch::RestrictPt
   const int m = threadIdx.x;
   const int i = blockIdx.x;
   float tv, t;
-  int loc1, loc2;
-  float tr[64];
   int sz = min(64,d);
   if(m < d && i < bh){
     // UNMASKED PART ////////////////////////////
@@ -56,8 +54,6 @@ void calc_gradq_masked(torch::PackedTensorAccessor32<float,3,torch::RestrictPtrT
   const int m = threadIdx.x;
   const int i = blockIdx.x;
   float tv, t;
-  int loc1, loc2;
-  float tr[64];
   int sz = min(64,d);
   if(m < d && i < bh){
     // MASKED PART ////////////////////////////
@@ -87,8 +83,6 @@ void calc_gradk_unmasked(torch::PackedTensorAccessor32<float,3,torch::RestrictPt
   const int m = threadIdx.x;
   const int i = blockIdx.x;
   float tv, t;
-  int loc1, loc2;
-  float tr[64];
   int sz = min(64,d);
   if(m < d && i < bh){
 
@@ -116,8 +110,6 @@ void calc_gradk_masked(torch::PackedTensorAccessor32<float,3,torch::RestrictPtrT
   const int m = threadIdx.x;
   const int i = blockIdx.x;
   float tv, t;
-  int loc1, loc2;
-  float tr[64];
   int sz = min(64,d);
   if(m < d && i < bh){
 
@@ -146,8 +138,6 @@ void calc_gradv_unmasked(torch::PackedTensorAccessor32<float,3,torch::RestrictPt
   const int outer = threadIdx.x;
   const int i = blockIdx.x;
   float tv, t;
-  int loc1, loc2;
-  float tr[64];
   int sz = min(64,d);
   if(i < bh && outer < d){
     // UNMASKED PART ////////////////////////////
@@ -181,8 +171,6 @@ void calc_gradv_masked(torch::PackedTensorAccessor32<float,3,torch::RestrictPtrT
   const int outer = threadIdx.x;
   const int i = blockIdx.x;
   float tv, t;
-  int loc1, loc2;
-  float tr[64];
   int sz = min(64,d);
   if(i < bh && outer < d){
     // MASKED PART ////////////////////////////
