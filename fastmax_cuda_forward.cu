@@ -28,8 +28,6 @@ void calc_unmasked(const torch::PackedTensorAccessor32<float,3,torch::RestrictPt
   const int outer = threadIdx.x;
   const int i = blockIdx.x;
   float tv, t;
-  int loc1, loc2;
-  float tr[64];
   int sz = min(64,d);
   if(outer < d && i < bh){
 
@@ -89,8 +87,6 @@ void calc_masked(const torch::PackedTensorAccessor32<float,3,torch::RestrictPtrT
   const int outer = threadIdx.x;
   const int i = blockIdx.x;
   float tv, t;
-  int loc1, loc2;
-  float tr[64];
   int sz = min(64,d);
   if(outer < d && i < bh){
 
