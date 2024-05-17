@@ -47,52 +47,6 @@ void calc_gradq_unmasked(torch::PackedTensorAccessor32<float,3,torch::RestrictPt
       }
     }
 
-    // calc q 1
-    for(int outer = 0; outer < d; ++outer){
-      for(int rr = 0; rr < d/sz; ++rr){
-        for(int r = 0; r < sz; ++r) tr[r]= 0;
-        for(int l = 0; l < nk; l++){
-          s[d+m] = k[l][i][m];
-          tv = v[l][i][outer]*k[l][i][m];
-          __syncthreads();          
-          loc1 = d+rr*sz;
-          for(int r = 0; r < sz; ++r){
-            tr[r] += s[loc1+r]*tv;
-          }
-        }
-        for(int l = 0; l < nq; l++){
-          s[m] = q[l][i][m];
-          __syncthreads();
-          t = 0;
-          loc2 = rr*sz;
-          for(int r = 0; r < sz; ++r){
-            t += tr[r]*s[loc2+r];
-          }
-          gradq[l][i][m] += a22*t*grad_output[l][i][outer];
-        }
-
-        for(int r = 0; r < sz; ++r) tr[r]= 0;
-        for(int l = 0; l < nk; l++){
-          s[d+m] = k[l][i][m];
-          tv = k[l][i][m];
-          __syncthreads();          
-          loc1 = d+rr*sz;
-          for(int r = 0; r < sz; ++r){
-            tr[r] += s[loc1+r]*tv;
-          }
-        }
-        for(int l = 0; l < nq; l++){
-          s[m] = q[l][i][m];
-          __syncthreads();
-          t = 0;
-          loc2 = rr*sz;
-          for(int r = 0; r < sz; ++r){
-            t += tr[r]*s[loc2+r];
-          }
-          gradq[l][i][m] -= a22*t*grad_output[l][i][outer]*o[l][i][outer];
-        }
-      }
-    }
   }
 }
 
@@ -122,64 +76,6 @@ void calc_gradq_masked(torch::PackedTensorAccessor32<float,3,torch::RestrictPtrT
       }
     }
 
-    // calc q 1
-    for(int outer = 0; outer < d; ++outer){
-      for(int rr = 0; rr < d/sz; ++rr){
-        for(int r = 0; r < sz; ++r) tr[r]= 0;
-        for(int l = 0; l < nk-nq; l++){
-          s[d+m] = k[l][i][m];
-          tv = v[l][i][outer]*k[l][i][m];
-          __syncthreads();          
-          loc1 = d+rr*sz;
-          for(int r = 0; r < sz; ++r){
-            tr[r] += s[loc1+r]*tv;
-          }
-        }
-        for(int l = 0; l < nq; l++){
-          s[d+m] = k[nk-nq+l][i][m];
-          tv = v[nk-nq+l][i][outer]*k[nk-nq+l][i][m];
-          s[m] = q[l][i][m];
-          __syncthreads();          
-          loc1 = d+rr*sz;
-          for(int r = 0; r < sz; ++r){
-            tr[r] += s[loc1+r]*tv;
-          }
-          t = 0;
-          loc2 = rr*sz;
-          for(int r = 0; r < sz; ++r){
-            t += tr[r]*s[loc2+r];
-          }
-          gradq[l][i][m] += a22*t*grad_output[l][i][outer];
-        }
-
-        for(int r = 0; r < sz; ++r) tr[r]= 0;
-        for(int l = 0; l < nk-nq; l++){
-          s[d+m] = k[nk-nq+l][i][m];
-          tv = k[l][i][m];
-          __syncthreads();          
-          loc1 = d+rr*sz;
-          for(int r = 0; r < sz; ++r){
-            tr[r] += s[loc1+r]*tv;
-          }
-        }
-        for(int l = 0; l < nq; l++){
-          s[d+m] = k[nk-nq+l][i][m];
-          tv = k[nk-nq+l][i][m];
-          s[m] = q[l][i][m];
-          __syncthreads();         
-          loc1 = d+rr*sz;
-          for(int r = 0; r < sz; ++r){
-            tr[r] += s[loc1+r]*tv;
-          }
-          t = 0;
-          loc2 = rr*sz;
-          for(int r = 0; r < sz; ++r){
-            t += tr[r]*s[loc2+r];
-          }
-          gradq[l][i][m] -= a22*t*grad_output[l][i][outer]*o[l][i][outer];
-        }
-      }
-    }
   }
 }
 
@@ -210,52 +106,6 @@ void calc_gradk_unmasked(torch::PackedTensorAccessor32<float,3,torch::RestrictPt
       }
     }
 
-    // calc k 1
-    for(int outer = 0; outer < d; ++outer){
-      for(int rr = 0; rr < d/sz; ++rr){
-        for(int r = 0; r < sz; ++r) tr[r]= 0;
-        for(int l = 0; l < nq; l++){
-          s[d+m] = q[l][i][m];
-          tv = q[l][i][m]*grad_output[l][i][outer];
-          __syncthreads();
-          loc1 = d+rr*sz;
-          for(int r = 0; r < sz; ++r){
-            tr[r] += tv*s[loc1+r];
-          }
-        }
-        for(int l = 0; l < nk; l++){
-          s[m] = k[l][i][m];
-          __syncthreads();
-          loc2 = rr*sz;
-          t = 0;
-          for(int r = 0; r < sz; ++r){
-            t += tr[r]*s[loc2+r];
-          }
-          gradk[l][i][m] += a22*t*v[l][i][outer];
-        }
-
-        for(int r = 0; r < sz; ++r) tr[r]= 0;
-        for(int l = 0; l < nq; l++){
-          s[d+m] = q[l][i][m];
-          tv = o[l][i][outer]*q[l][i][m]*grad_output[l][i][outer];
-          __syncthreads();
-          loc1 = d+rr*sz;
-          for(int r = 0; r < sz; ++r){
-            tr[r] += tv*s[loc1+r];
-          }
-        }
-        for(int l = 0; l < nk; l++){
-          s[m] = k[l][i][m];
-          __syncthreads();
-          loc2 = rr*sz;
-          t = 0;
-          for(int r = 0; r < sz; ++r){
-            t += tr[r]*s[loc2+r];
-          }
-          gradk[l][i][m] -= a22*t;
-        }
-      }
-    }
   }
 }
 
@@ -286,66 +136,6 @@ void calc_gradk_masked(torch::PackedTensorAccessor32<float,3,torch::RestrictPtrT
       }
     }
 
-    // calc k 1
-    for(int outer = 0; outer < d; ++outer){
-      for(int rr = 0; rr < d/sz; ++rr){
-        for(int r = 0; r < sz; ++r) tr[r]= 0;
-        for(int l = nq-1; l >= 0; --l){
-          s[d+m] = q[l][i][m];
-          tv = q[l][i][m]*grad_output[l][i][outer];
-          s[m] = k[l][i][m];
-          __syncthreads();
-          loc1 = d+rr*sz;
-          for(int r = 0; r < sz; ++r){
-            tr[r] += tv*s[loc1+r];
-          }
-          loc2 = rr*sz;
-          t = 0;
-          for(int r = 0; r < sz; ++r){
-            t += tr[r]*s[loc2+r];
-          }
-          gradk[l][i][m] += a22*t*v[l][i][outer];
-        }
-        for(int l = nk-nq-1; l >= 0; --l){
-          s[m] = k[l][i][m];
-          __syncthreads();
-          loc2 = rr*sz;
-          t = 0;
-          for(int r = 0; r < sz; ++r){
-            t += tr[r]*s[loc2+r];
-          }
-          gradk[l][i][m] += a22*t*v[l][i][outer];
-        }
-
-        for(int r = 0; r < sz; ++r) tr[r]= 0;
-        for(int l = nq-1; l >= 0; --l){
-          s[d+m] = q[l][i][m];
-          tv = o[l][i][outer]*q[l][i][m]*grad_output[l][i][outer];
-          s[m] = k[l][i][m];
-          __syncthreads();
-          loc1 = d+rr*sz;
-          for(int r = 0; r < sz; ++r){
-            tr[r] += tv*s[loc1+r];
-          }
-          loc2 = rr*sz;
-          t = 0;
-          for(int r = 0; r < sz; ++r){
-            t += tr[r]*s[loc2+r];
-          }
-          gradk[l][i][m] -= a22*t;
-        }
-        for(int l = nk-nq-1; l >= 0; --l){
-          s[m] = k[l][i][m];
-          __syncthreads();
-          loc2 = rr*sz;
-          t = 0;
-          for(int r = 0; r < sz; ++r){
-            t += tr[r]*s[loc2+r];
-          }
-          gradk[l][i][m] -= a22*t;
-        }
-      }
-    }
   }
 }
 
@@ -381,31 +171,6 @@ void calc_gradv_unmasked(torch::PackedTensorAccessor32<float,3,torch::RestrictPt
       }
     }
 
-    // calc v 2
-    for(int m = 0; m < d; ++m){
-      for(int rr = 0; rr < d/sz; ++rr){
-        for(int r = 0; r < sz; ++r) tr[r]= 0;
-        for(int l = 0; l < nq; l++){
-          s[outer] = q[l][i][m]*q[l][i][outer];
-          tv = grad_output[l][i][outer];
-          __syncthreads();
-          loc1 = rr*sz;
-          for(int r = 0; r < sz; ++r){
-            tr[r] += s[loc1+r]*tv;
-          }
-        }
-        for(int l = 0; l < nk; l++){
-          s[d+outer] = k[l][i][m]*k[l][i][outer];
-          __syncthreads();
-          loc2 = d+rr*sz;
-          t = 0;
-          for(int r = 0; r < sz; ++r){
-            t += tr[r]*s[loc2+r];
-          }
-          gradv[l][i][outer] += a2*t;
-        }
-      }
-    }
   }
 }
 
@@ -443,38 +208,6 @@ void calc_gradv_masked(torch::PackedTensorAccessor32<float,3,torch::RestrictPtrT
       }
     }
 
-    // calc v 2
-    for(int m = 0; m < d; ++m){
-      for(int rr = 0; rr < d/sz; ++rr){
-        for(int r = 0; r < sz; ++r) tr[r]= 0;
-        for(int l = nq-1; l >= 0; --l){
-          s[outer] = q[l][i][m]*q[l][i][outer];
-          tv = grad_output[l][i][outer];
-          s[d+outer] = k[l][i][m]*k[l][i][outer];
-          __syncthreads();
-          loc1 = rr*sz;
-          for(int r = 0; r < sz; ++r){
-            tr[r] += s[loc1+r]*tv;
-          }
-          loc2 = d+rr*sz;
-          t = 0;
-          for(int r = 0; r < sz; ++r){
-            t += tr[r]*s[loc2+r];
-          }
-          gradv[l][i][outer] += a2*t;
-        }
-        for(int l = nk-nq-1; l >= 0; --l){
-          s[d+outer] = k[l][i][m]*k[l][i][outer];
-          __syncthreads();
-          loc2 = d+rr*sz;
-          t = 0;
-          for(int r = 0; r < sz; ++r){
-            t += tr[r]*s[loc2+r];
-          }
-          gradv[l][i][outer] += a2*t;
-        }
-      }
-    }
   }
 }
 
